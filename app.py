@@ -512,14 +512,14 @@ else:
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
                     x=[rd["round"] for rd in rounds],
-                    y=[rd["expert_ws_ewa"] for rd in rounds],
+                    y=[rd.get("expert_ws_ewa", 0) for rd in rounds],
                     mode="lines+markers",
                     name="EWA (Entropy-Weighted)",
                     line=dict(color="#1e40af", width=2),
                 ))
                 fig.add_trace(go.Scatter(
                     x=[rd["round"] for rd in rounds],
-                    y=[rd["expert_ws_fedavg"] for rd in rounds],
+                    y=[rd.get("expert_ws_fedavg", 0) for rd in rounds],
                     mode="lines+markers",
                     name="FedAvg (Equal-Weight)",
                     line=dict(color="#94a3b8", width=2, dash="dash"),
@@ -541,13 +541,16 @@ else:
                 fig2 = go.Figure()
                 fig2.add_trace(go.Scatter(
                     x=[rd["round"] for rd in rounds],
-                    y=[rd["avg_entropy"] for rd in rounds],
+                    y=[rd.get("avg_entropy", 0) for rd in rounds],
                     mode="lines+markers",
                     name="Mean Entropy",
                     line=dict(color="#7c3aed", width=2),
                 ))
-                n_classes = len(rounds[0].get("per_class_acc", {})) if rounds else 3
-                max_entropy = np.log(max(n_classes, 2))
+                # Use n_classes from summary or data, fallback to 3
+                n_classes = r.get("n_classes", len(s.get("final_per_class_acc", {})))
+                if n_classes < 2:
+                    n_classes = 3
+                max_entropy = np.log(n_classes)
                 fig2.add_hline(y=max_entropy, line_dash="dot", line_color="#e2e8f0",
                                annotation_text=f"ln({n_classes})={max_entropy:.2f} (max)")
                 fig2.update_layout(
@@ -564,7 +567,7 @@ else:
             fig3 = go.Figure()
             fig3.add_trace(go.Scatter(
                 x=[rd["round"] for rd in rounds],
-                y=[rd["test_acc"] for rd in rounds],
+                y=[rd.get("test_acc", 0) for rd in rounds],
                 mode="lines+markers",
                 name="Test Accuracy",
                 line=dict(color="#059669", width=2),
@@ -579,7 +582,8 @@ else:
             )
             st.plotly_chart(fig3, use_container_width=True, key=f"real_acc_{key}")
 
-            # Summary stats
+            # Summary stats — use st.columns with markdown instead of st.metric
+            # to avoid Streamlit version incompatibility with delta parameter
             st.markdown("#### Summary Statistics")
             ewa_mean = s.get("ewa_expert_ws_mean")
             ewa_std = s.get("ewa_expert_ws_std")
@@ -589,26 +593,18 @@ else:
             delta_pct = s.get("delta_pct", s.get("delta_relative_pct", 0))
             final_acc = s.get("final_test_acc")
 
+            def _fmt(val, fmt_str, fallback="N/A"):
+                return f"{val:{fmt_str}}" if val is not None else fallback
+
             stat_cols = st.columns(4)
             with stat_cols[0]:
-                st.metric("EWA Expert Wt",
-                          f"{ewa_mean:.1f}%" if ewa_mean is not None else "N/A",
-                          delta=f"± {ewa_std:.1f}%" if ewa_std is not None else None,
-                          key=f"real_m1_{key}")
+                st.markdown(f"**EWA Expert Wt**\n\n# {_fmt(ewa_mean, '.1f')}%\n\n± {_fmt(ewa_std, '.1f')}%")
             with stat_cols[1]:
-                st.metric("FedAvg Expert Wt",
-                          f"{fed_mean:.1f}%" if fed_mean is not None else "N/A",
-                          delta=f"± {fed_std:.1f}%" if fed_std is not None else None,
-                          key=f"real_m2_{key}")
+                st.markdown(f"**FedAvg Expert Wt**\n\n# {_fmt(fed_mean, '.1f')}%\n\n± {_fmt(fed_std, '.1f')}%")
             with stat_cols[2]:
-                st.metric("Δ (EWA − FedAvg)",
-                          f"+{delta_pp:.1f}pp" if delta_pp is not None else "N/A",
-                          delta=f"{delta_pct:.1f}%" if delta_pct is not None else None,
-                          key=f"real_m3_{key}")
+                st.markdown(f"**Δ (EWA − FedAvg)**\n\n# +{_fmt(delta_pp, '.1f')}pp\n\n({_fmt(delta_pct, '.1f')}%)")
             with stat_cols[3]:
-                st.metric("Final Accuracy",
-                          f"{final_acc:.1%}" if final_acc is not None else "N/A",
-                          key=f"real_m4_{key}")
+                st.markdown(f"**Final Accuracy**\n\n# {_fmt(final_acc, '.1%')}")
 
     # Export
     st.markdown("## 💾 Export Results")
