@@ -289,17 +289,15 @@ if mode == "🧪 Simulated Demo":
         st.markdown("## 📊 Per-Task Detail")
         task_tabs = st.tabs([results[k].task_name for k in results])
 
+        # Helper: normalize round dict keys between simulated and real modes.
+        def _safe_get(rd, key_sim, key_real, default=0.0):
+            return rd.get(key_real, rd.get(key_sim, default))
+
         for tab, key in zip(task_tabs, results):
             r = results[key]
             s = r.summary["expert_specialty_weight"]
             with tab:
                 col1, col2 = tab.columns(2)
-
-                # Normalize round dict keys: simulated uses expert_weight_share /
-                # specialty_conformity; real uses expert_ws_ewa / expert_ws_fedavg /
-                # conformity_score.
-                def _safe_get(rd, key_sim, key_real, default=0.0):
-                    return rd.get(key_real, rd.get(key_sim, default))
 
                 has_fedavg = any("expert_ws_fedavg" in rd for rd in r.rounds)
 
@@ -327,7 +325,7 @@ if mode == "🧪 Simulated Demo":
                         margin=dict(l=0, r=0, t=10, b=0),
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key=f"sim_ews_{key}")
 
                 with col2:
                     st.markdown("#### Conformity Score Over Rounds")
@@ -345,7 +343,7 @@ if mode == "🧪 Simulated Demo":
                         xaxis_title="FL Round", yaxis_title="Conformity Score",
                         margin=dict(l=0, r=0, t=10, b=0),
                     )
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, use_container_width=True, key=f"sim_conf_{key}")
 
                 # Client details
                 st.markdown("#### Client Configuration")
@@ -359,7 +357,7 @@ if mode == "🧪 Simulated Demo":
                         "Confidence": f"{c.confidence_range[0]:.0%}–{c.confidence_range[1]:.0%}",
                         "Distribution": dist_str,
                     })
-                st.dataframe(client_rows, use_container_width=True, hide_index=True)
+                st.dataframe(client_rows, use_container_width=True, hide_index=True, key=f"sim_clients_{key}")
 
         # Export
         st.markdown("## 💾 Export Results")
@@ -536,7 +534,7 @@ else:
                     margin=dict(l=0, r=0, t=10, b=0),
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key=f"real_ews_{key}")
 
             with col2:
                 st.markdown("#### Average Entropy Over Rounds")
@@ -548,8 +546,10 @@ else:
                     name="Mean Entropy",
                     line=dict(color="#7c3aed", width=2),
                 ))
-                fig2.add_hline(y=np.log(3), line_dash="dot", line_color="#e2e8f0",
-                               annotation_text=f"ln(3)={np.log(3):.2f} (max for 3-class)")
+                n_classes = len(rounds[0].get("per_class_acc", {})) if rounds else 3
+                max_entropy = np.log(max(n_classes, 2))
+                fig2.add_hline(y=max_entropy, line_dash="dot", line_color="#e2e8f0",
+                               annotation_text=f"ln({n_classes})={max_entropy:.2f} (max)")
                 fig2.update_layout(
                     template="plotly_white",
                     height=350,
@@ -557,7 +557,7 @@ else:
                     yaxis_title="Average Entropy (nats)",
                     margin=dict(l=0, r=0, t=10, b=0),
                 )
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, use_container_width=True, key=f"real_entropy_{key}")
 
             # Test accuracy over rounds
             st.markdown("#### Test Accuracy Over Rounds")
@@ -577,19 +577,19 @@ else:
                 yaxis_tickformat=".0%",
                 margin=dict(l=0, r=0, t=10, b=0),
             )
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, use_container_width=True, key=f"real_acc_{key}")
 
             # Summary stats
             st.markdown("#### Summary Statistics")
             stat_cols = st.columns(4)
             with stat_cols[0]:
-                st.metric("EWA Expert Wt", f"{s['ewa_expert_ws_mean']:.1f}%", f"± {s['ewa_expert_ws_std']:.1f}%")
+                st.metric("EWA Expert Wt", f"{s['ewa_expert_ws_mean']:.1f}%", f"± {s['ewa_expert_ws_std']:.1f}%", key=f"real_m1_{key}")
             with stat_cols[1]:
-                st.metric("FedAvg Expert Wt", f"{s['fedavg_expert_ws_mean']:.1f}%", f"± {s['fedavg_expert_ws_std']:.1f}%")
+                st.metric("FedAvg Expert Wt", f"{s['fedavg_expert_ws_mean']:.1f}%", f"± {s['fedavg_expert_ws_std']:.1f}%", key=f"real_m2_{key}")
             with stat_cols[2]:
-                st.metric("Δ (EWA − FedAvg)", f"+{s.get('delta_pp', 0):.1f}pp")
+                st.metric("Δ (EWA − FedAvg)", f"+{s.get('delta_pp', 0):.1f}pp", key=f"real_m3_{key}")
             with stat_cols[3]:
-                st.metric("Final Accuracy", f"{s['final_test_acc']:.1%}")
+                st.metric("Final Accuracy", f"{s['final_test_acc']:.1%}", key=f"real_m4_{key}")
 
     # Export
     st.markdown("## 💾 Export Results")
