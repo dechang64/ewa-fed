@@ -581,15 +581,34 @@ else:
 
             # Summary stats
             st.markdown("#### Summary Statistics")
+            ewa_mean = s.get("ewa_expert_ws_mean")
+            ewa_std = s.get("ewa_expert_ws_std")
+            fed_mean = s.get("fedavg_expert_ws_mean")
+            fed_std = s.get("fedavg_expert_ws_std")
+            delta_pp = s.get("delta_pp", 0)
+            delta_pct = s.get("delta_pct", s.get("delta_relative_pct", 0))
+            final_acc = s.get("final_test_acc")
+
             stat_cols = st.columns(4)
             with stat_cols[0]:
-                st.metric("EWA Expert Wt", f"{s['ewa_expert_ws_mean']:.1f}%", f"± {s['ewa_expert_ws_std']:.1f}%", key=f"real_m1_{key}")
+                st.metric("EWA Expert Wt",
+                          f"{ewa_mean:.1f}%" if ewa_mean is not None else "N/A",
+                          delta=f"± {ewa_std:.1f}%" if ewa_std is not None else None,
+                          key=f"real_m1_{key}")
             with stat_cols[1]:
-                st.metric("FedAvg Expert Wt", f"{s['fedavg_expert_ws_mean']:.1f}%", f"± {s['fedavg_expert_ws_std']:.1f}%", key=f"real_m2_{key}")
+                st.metric("FedAvg Expert Wt",
+                          f"{fed_mean:.1f}%" if fed_mean is not None else "N/A",
+                          delta=f"± {fed_std:.1f}%" if fed_std is not None else None,
+                          key=f"real_m2_{key}")
             with stat_cols[2]:
-                st.metric("Δ (EWA − FedAvg)", f"+{s.get('delta_pp', 0):.1f}pp", key=f"real_m3_{key}")
+                st.metric("Δ (EWA − FedAvg)",
+                          f"+{delta_pp:.1f}pp" if delta_pp is not None else "N/A",
+                          delta=f"{delta_pct:.1f}%" if delta_pct is not None else None,
+                          key=f"real_m3_{key}")
             with stat_cols[3]:
-                st.metric("Final Accuracy", f"{s['final_test_acc']:.1%}", key=f"real_m4_{key}")
+                st.metric("Final Accuracy",
+                          f"{final_acc:.1%}" if final_acc is not None else "N/A",
+                          key=f"real_m4_{key}")
 
     # Export
     st.markdown("## 💾 Export Results")
