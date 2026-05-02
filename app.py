@@ -295,21 +295,30 @@ if mode == "🧪 Simulated Demo":
             with tab:
                 col1, col2 = tab.columns(2)
 
+                # Normalize round dict keys: simulated uses expert_weight_share /
+                # specialty_conformity; real uses expert_ws_ewa / expert_ws_fedavg /
+                # conformity_score.
+                def _safe_get(rd, key_sim, key_real, default=0.0):
+                    return rd.get(key_real, rd.get(key_sim, default))
+
+                has_fedavg = any("expert_ws_fedavg" in rd for rd in r.rounds)
+
                 with col1:
                     st.markdown("#### Expert Weight Share Over Rounds")
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(
                         x=[rd["round"] for rd in r.rounds],
-                        y=[rd["expert_ws_ewa"] for rd in r.rounds],
+                        y=[_safe_get(rd, "expert_weight_share", "expert_ws_ewa") for rd in r.rounds],
                         mode="lines+markers", name="EWA",
                         line=dict(color="#1e40af", width=2),
                     ))
-                    fig.add_trace(go.Scatter(
-                        x=[rd["round"] for rd in r.rounds],
-                        y=[rd["expert_ws_fedavg"] for rd in r.rounds],
-                        mode="lines+markers", name="FedAvg",
-                        line=dict(color="#94a3b8", width=2, dash="dash"),
-                    ))
+                    if has_fedavg:
+                        fig.add_trace(go.Scatter(
+                            x=[rd["round"] for rd in r.rounds],
+                            y=[rd.get("expert_ws_fedavg", 0) for rd in r.rounds],
+                            mode="lines+markers", name="FedAvg",
+                            line=dict(color="#94a3b8", width=2, dash="dash"),
+                        ))
                     fig.add_hline(y=50, line_dash="dot", line_color="#e2e8f0",
                                   annotation_text="50% threshold")
                     fig.update_layout(
@@ -325,7 +334,7 @@ if mode == "🧪 Simulated Demo":
                     fig2 = go.Figure()
                     fig2.add_trace(go.Scatter(
                         x=[rd["round"] for rd in r.rounds],
-                        y=[rd["conformity_score"] for rd in r.rounds],
+                        y=[_safe_get(rd, "specialty_conformity", "conformity_score") for rd in r.rounds],
                         mode="lines+markers", name="Conformity",
                         line=dict(color="#dc2626", width=2),
                     ))
